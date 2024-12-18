@@ -34,6 +34,7 @@ typedef struct Basket {
 } Basket;
 
 Apple _apples[APPLE_MAX_COUNT];
+Basket basket;
 
 typedef enum GameState
 {
@@ -41,21 +42,12 @@ typedef enum GameState
     END
 } GameState;
 
-int main(void)
-{
-    srand(time(NULL));
 
-    InitWindow(SCREEN_WIDTH,SCREEN_HEIGHT, "Catch the C");
-
-    int apples_count = 0;
-
-    float apple_apper_time = .9f;
-    Timer timer = {0};
-
+void InitGame(){
     Texture APPLE_TEXTURE = LoadTexture("res/C_Logo.png");
     Texture BASKET_TEXTURE = LoadTexture("res/basket.png");
 
-    Basket basket = {
+    basket = (Basket) {
         .texture = BASKET_TEXTURE,
         .pos = {SCREEN_WIDTH/2, SCREEN_HEIGHT - 90},
         .speed = 200,
@@ -72,51 +64,72 @@ int main(void)
         };
 
     }
+}
+void UpdateBasket()
+{
+    Vector2 motion = {0,0};
+    Vector2 basket_scale;
 
-    TimerStart(&timer, apple_apper_time);
-    bool collision = false;
-    while (!WindowShouldClose())
-    {
-        char str[40];
-        int random_x_pos = GetRandomValue(200, SCREEN_WIDTH-200);
-        Vector2 motion = {0,0};
-        Vector2 basket_scale;
+    if (IsKeyDown(KEY_A))
+        motion.x += -1;
+    if (IsKeyDown(KEY_D))
+        motion.x += 1;
 
+    basket_scale = Vector2Scale(motion, GetFrameTime() * basket.speed);
+    basket.pos = Vector2Add(basket.pos, basket_scale);
+}
 
-        if (IsKeyDown(KEY_A))
-            motion.x += -1;
-        if (IsKeyDown(KEY_D))
-            motion.x += 1;
-
-        basket_scale = Vector2Scale(motion, GetFrameTime() * basket.speed);
-        basket.pos = Vector2Add(basket.pos, basket_scale);
-
-
-        for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-            if (_apples[i].active) {
-                if (CheckCollisionRecs(
-                    (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/4},
-                    (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width, basket.src_rect.height}
-                )
-                ) {
-                    _apples[i].active = false;
-                    apples_count++;
-                }
+bool DidColide() {
+    for (int i = 0; i < APPLE_MAX_COUNT; i++) {
+        if (_apples[i].active) {
+            if (CheckCollisionRecs(
+                (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/4},
+                (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width, basket.src_rect.height}
+            )
+            ) {
+                _apples[i].active = false;
+                return true;
             }
         }
+    }
+    return false;
+}
 
+void UpdateApples()
+{
+    for (int i = 0; i < APPLE_MAX_COUNT; i++) {
+        if (!_apples[i].active) {
+            float fall_speed = GetRandomValue(200, 500);
+
+            _apples[i].active = true;
+            _apples[i].pos = (Vector2) {GetRandomValue(200, SCREEN_WIDTH-200), -100};
+            _apples[i].fall_speed = fall_speed;
+            break;
+        }
+    }
+}
+
+int main(void)
+{
+    srand(time(NULL));
+
+    InitWindow(SCREEN_WIDTH,SCREEN_HEIGHT, "Catch the C");
+    InitGame();
+    int apples_count = 0;
+
+    float count_down = .9f;
+    Timer timer = {0};
+    TimerStart(&timer, count_down);
+    while (!WindowShouldClose())
+    {
+        UpdateBasket();
+
+        if (TimerDone(&timer)) {
+            UpdateApples();
+            TimerStart(&timer, count_down);
+        }
 
         for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-            if (TimerDone(&timer) && !_apples[i].active) {
-                float fall_speed = GetRandomValue(100, 200);
-
-                _apples[i].active = true;
-                _apples[i].pos = (Vector2) {random_x_pos, -100};
-                _apples[i].fall_speed = fall_speed;
-
-                TimerStart(&timer, apple_apper_time);
-            }
-
             if (_apples[i].active) {
                 Vector2 motion = {0,0};
                 motion.y++;
@@ -124,11 +137,16 @@ int main(void)
                 _apples[i].pos = Vector2Add(_apples[i].pos, apple_scale);
             }
         }
+
+        if (DidColide())
+            apples_count++;
+
         TimerUpdate(&timer);
 
         BeginDrawing();
         ClearBackground(BLACK);
 
+        char str[40];
         snprintf(str, 40, "%d", apples_count);
         DrawText(str, 10, 10, 80, WHITE);
 
