@@ -1,6 +1,6 @@
 #include "timer.h"
 
-void TimerStart(Timer* timer, float lifeteme)
+void TimerStart(Timer* timer, const float lifeteme)
 {
     if (NULL != timer)
         timer->lifetime = lifeteme;

@@ -39,11 +39,13 @@ Basket basket;
 typedef enum GameState
 {
     PLAYING,
+    PAUSE,
     END
 } GameState;
 
 
-void InitGame(){
+void InitGame()
+{
     Texture APPLE_TEXTURE = LoadTexture("res/C_Logo.png");
     Texture BASKET_TEXTURE = LoadTexture("res/basket.png");
 
@@ -78,14 +80,13 @@ void UpdateBasket()
     basket_scale = Vector2Scale(motion, GetFrameTime() * basket.speed);
     basket.pos = Vector2Add(basket.pos, basket_scale);
 }
-
 bool DidColide() {
     for (int i = 0; i < APPLE_MAX_COUNT; i++) {
         if (_apples[i].active) {
             if (CheckCollisionRecs(
                 (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/4},
-                (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width, basket.src_rect.height}
-            )
+                (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width/2, basket.src_rect.height/2}
+                )
             ) {
                 _apples[i].active = false;
                 return true;
@@ -95,78 +96,101 @@ bool DidColide() {
     return false;
 }
 
-void UpdateApples()
+void UpdateApples(Timer* timer, float count_down)
 {
-    for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-        if (!_apples[i].active) {
-            float fall_speed = GetRandomValue(200, 500);
+    if (TimerDone(timer)) {
+        for (int i = 0; i < APPLE_MAX_COUNT; i++) { // makes an apple active every (count_down) seconds
+            if (!_apples[i].active) {
+                float fall_speed = GetRandomValue(200, 500);
 
-            _apples[i].active = true;
-            _apples[i].pos = (Vector2) {GetRandomValue(200, SCREEN_WIDTH-200), -100};
-            _apples[i].fall_speed = fall_speed;
-            break;
+                _apples[i].active = true;
+                _apples[i].pos = (Vector2) {GetRandomValue(10, SCREEN_WIDTH-100), -100};
+                _apples[i].fall_speed = 500;
+                break;
+            }
+        }
+        TimerStart(timer, count_down);
+    }
+
+    for (int i = 0; i < APPLE_MAX_COUNT; i++) { // move all active apples
+        if (_apples[i].active) {
+            Vector2 motion = {0,0};
+            motion.y++;
+            Vector2 apple_scale = Vector2Scale(motion, GetFrameTime() * _apples[i].fall_speed);
+            _apples[i].pos = Vector2Add(_apples[i].pos, apple_scale);
         }
     }
 }
 
 int main(void)
 {
+    GameState game_state = PLAYING;
     srand(time(NULL));
 
     InitWindow(SCREEN_WIDTH,SCREEN_HEIGHT, "Catch the C");
     InitGame();
     int apples_count = 0;
+    int apples_missed = 0;
 
-    float count_down = .9f;
+    float count_down = .4f;
     Timer timer = {0};
     TimerStart(&timer, count_down);
     while (!WindowShouldClose())
     {
-        UpdateBasket();
-
-        if (TimerDone(&timer)) {
-            UpdateApples();
-            TimerStart(&timer, count_down);
+        if (IsKeyPressed(KEY_SPACE)) {
+            if (game_state == PAUSE) {
+                game_state = PLAYING;
+            } else
+                game_state = PAUSE;
         }
 
-        for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-            if (_apples[i].active) {
-                Vector2 motion = {0,0};
-                motion.y++;
-                Vector2 apple_scale = Vector2Scale(motion, GetFrameTime() * _apples[i].fall_speed);
-                _apples[i].pos = Vector2Add(_apples[i].pos, apple_scale);
-            }
+        if (game_state == PLAYING) {
+            UpdateBasket();
+            UpdateApples(&timer, count_down);
+            if (DidColide())
+                apples_count++;
+            TimerUpdate(&timer);
         }
-
-        if (DidColide())
-            apples_count++;
-
-        TimerUpdate(&timer);
 
         BeginDrawing();
         ClearBackground(BLACK);
 
-        char str[40];
-        snprintf(str, 40, "%d", apples_count);
-        DrawText(str, 10, 10, 80, WHITE);
+            char str[40];
+            char str2[40];
+            snprintf(str, 40, "Cought %d", apples_count);
+            snprintf(str2, 40, "Missed %d", apples_missed);
 
-        DrawTexturePro(
-            basket.texture,
-            basket.src_rect,
-            (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width, basket.src_rect.height},
-            basket.center,
-            0, WHITE);
+            DrawTexturePro(
+                basket.texture,
+                basket.src_rect,
+                (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width /2, basket.src_rect.height/2 },
+                Vector2Divide(basket.center, (Vector2) {2,2}),
+                0, WHITE);
 
-        for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-            if (_apples[i].active) {
-                DrawTexturePro(
-                    _apples[i].texture,
-                    _apples[i].src_rect,
-                    (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/3},
-                    Vector2Divide(_apples[i].center, (Vector2) {3,3}),
-                    0, WHITE);
+            for (int i = 0; i < APPLE_MAX_COUNT; i++) {
+                if (_apples[i].active && _apples[i].pos.y <= SCREEN_HEIGHT) {
+                    DrawTexturePro(
+                        _apples[i].texture,
+                        _apples[i].src_rect,
+                        (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/3},
+                        Vector2Divide(_apples[i].center, (Vector2) {3,3}),
+                        0, WHITE);
+                }
+
+                if (_apples[i].pos.y >= SCREEN_HEIGHT) {
+                    apples_missed++;
+                    _apples[i].active = false;
+                }
             }
-        }
+
+            DrawText(str, 10, 10, 60, WHITE);
+            DrawText(str2, 10, 80, 60, RED);
+
+            if (game_state == PAUSE) {
+                DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){255,255,255,170});
+                Vector2 text_vec = MeasureTextEx(GetFontDefault(), "PAUSED", 80, 10);
+                DrawTextPro(GetFontDefault(), "PAUSED", (Vector2) {SCREEN_WIDTH/2 - text_vec.x/2, SCREEN_HEIGHT/2 - text_vec.y/2}, (Vector2) {0,0}, 0, 80, 10, BLACK);
+            }
 
         EndDrawing();
     }
