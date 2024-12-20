@@ -1,8 +1,6 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include <raylib.h>
 #ifndef TIMER_H
 #define TIMER_H
+#include "stdincl.h"
 
 typedef struct {
     float lifetime;

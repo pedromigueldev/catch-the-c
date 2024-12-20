@@ -2,8 +2,8 @@ CC=gcc
 RAYLIB= -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 CFLAGS=-I. -g -Wall
 
-DEPS = timer.h
-OBJ = src/main.o src/timer.o
+DEPS = timer.h apple.h stdincl.h
+OBJ = src/main.o src/timer.o src/apple.o
 
 all: main
 %.o: %.c $(DEPS)
