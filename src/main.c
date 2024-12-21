@@ -4,41 +4,67 @@
 #include <stdlib.h>
 
 #include "stdincl.h"
+#include "game.h"
 #include "timer.h"
 #include "apple.h"
-
-#define SCREEN_WIDTH 700
-#define SCREEN_HEIGHT 700
-#define SCREEN_SIZE CLITERAL(Vector2) {SCREEN_WIDTH, SCREEN_HEIGHT}
-
-
-typedef struct Basket {
-    Texture texture;
-    Vector2 pos;
-    float speed;
-
-    Rectangle src_rect;
-    Rectangle dst_rect;
-    Vector2 center;
-} Basket;
-
-Basket basket;
-
-typedef enum state
-{
-    PLAYING,
-    PAUSE,
-    END
-} state;
-
-typedef struct GameState
-{
-    state state;
-    int apples_count;
-    int apples_missed;
-} GameState;
+#include "basket.h"
 
 GameState Game;
+Basket basket;
+Apple _apples[APPLE_MAX_COUNT];
+
+void InitGame();
+void RenderGame();
+void RenderUI();
+
+int main(void)
+{
+    srand(time(NULL));
+
+    InitWindow(SCREEN_WIDTH,SCREEN_HEIGHT, "Catch the C");
+    InitGame();
+
+    float count_down = .4f;
+    Timer timer = {0};
+    TimerStart(&timer, count_down);
+
+    while (!WindowShouldClose())
+    {
+        if (IsKeyPressed(KEY_SPACE)) {
+            if (Game.state == PAUSE) {
+                Game.state = PLAYING;
+            } else
+                Game.state = PAUSE;
+        }
+
+        if (Game.state == PLAYING) {
+            UpdateBasket(&basket);
+            UpdateApples(&timer, count_down, _apples);
+            if (DidCatchApple(&basket, _apples))
+                Game.apples_count++;
+            if (LostApple(_apples))
+                Game.apples_missed++;
+            TimerUpdate(&timer);
+        }
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+            RenderGame();
+            RenderUI();
+
+            if (Game.state == PAUSE) {
+                DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){255,255,255,170});
+                Vector2 text_vec = MeasureTextEx(GetFontDefault(), "PAUSED", 80, 10);
+                DrawTextPro(GetFontDefault(), "PAUSED", (Vector2) {SCREEN_WIDTH/2 - text_vec.x/2, SCREEN_HEIGHT/2 - text_vec.y/2}, (Vector2) {0,0}, 0, 80, 10, BLACK);
+            }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+    return 0;
+}
 
 void InitGame()
 {
@@ -69,6 +95,7 @@ void InitGame()
 
     }
 }
+
 void RenderGame()
 {
     DrawTexturePro(
@@ -89,7 +116,9 @@ void RenderGame()
         }
     }
 }
-void RenderUI() {
+
+void RenderUI()
+{
     char str[40];
     char str2[40];
     snprintf(str, 40, "Cought %d", Game.apples_count);
@@ -97,91 +126,4 @@ void RenderUI() {
 
     DrawText(str, 10, 10, 60, WHITE);
     DrawText(str2, 10, 80, 60, RED);
-}
-void UpdateBasket()
-{
-    Vector2 motion = {0,0};
-    Vector2 basket_scale;
-
-    if (IsKeyDown(KEY_A))
-        motion.x += -1;
-    if (IsKeyDown(KEY_D))
-        motion.x += 1;
-
-    basket_scale = Vector2Scale(motion, GetFrameTime() * basket.speed);
-    basket.pos = Vector2Add(basket.pos, basket_scale);
-}
-bool DidColide() {
-    for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-        if (_apples[i].active) {
-            if (CheckCollisionRecs(
-                (Rectangle){_apples[i].pos.x, _apples[i].pos.y, _apples[i].src_rect.width /3, _apples[i].src_rect.height/4},
-                (Rectangle) {basket.pos.x, basket.pos.y, basket.src_rect.width/2, basket.src_rect.height/2}
-                )
-            ) {
-                _apples[i].active = false;
-                return true;
-            }
-        }
-    }
-    return false;
-}
-bool LostApple()
-{
-    for (int i = 0; i < APPLE_MAX_COUNT; i++) {
-        if (_apples[i].pos.y >= SCREEN_HEIGHT) {
-            _apples[i].active = false;
-            _apples[i].pos.y = 0;
-            return true;
-        }
-    }
-    return false;
-}
-int main(void)
-{
-    srand(time(NULL));
-
-    InitWindow(SCREEN_WIDTH,SCREEN_HEIGHT, "Catch the C");
-    InitGame();
-
-    float count_down = .4f;
-    Timer timer = {0};
-    TimerStart(&timer, count_down);
-
-    while (!WindowShouldClose())
-    {
-        if (IsKeyPressed(KEY_SPACE)) {
-            if (Game.state == PAUSE) {
-                Game.state = PLAYING;
-            } else
-                Game.state = PAUSE;
-        }
-
-        if (Game.state == PLAYING) {
-            UpdateBasket();
-            UpdateApples(&timer, count_down);
-            if (DidColide())
-                Game.apples_count++;
-            if (LostApple())
-                Game.apples_missed++;
-            TimerUpdate(&timer);
-        }
-
-        BeginDrawing();
-        ClearBackground(BLACK);
-
-            RenderGame();
-            RenderUI();
-
-            if (Game.state == PAUSE) {
-                DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){255,255,255,170});
-                Vector2 text_vec = MeasureTextEx(GetFontDefault(), "PAUSED", 80, 10);
-                DrawTextPro(GetFontDefault(), "PAUSED", (Vector2) {SCREEN_WIDTH/2 - text_vec.x/2, SCREEN_HEIGHT/2 - text_vec.y/2}, (Vector2) {0,0}, 0, 80, 10, BLACK);
-            }
-
-        EndDrawing();
-    }
-
-    CloseWindow();
-    return 0;
 }
